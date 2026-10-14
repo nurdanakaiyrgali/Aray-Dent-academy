@@ -114,7 +114,13 @@
 <aside class="assistant-drawer" id="assistantDrawer" aria-label="ИИ-ассистент" aria-hidden="true"><div id="assistantDrawerContent"></div></aside>
 <div class="toast" id="toast"><span class="toast-icon"><svg><use href="#i-check"/></svg></span><span id="toastText">Готово</span></div>
 <div class="modal-backdrop" id="modalBackdrop"><section class="modal" id="modal" role="dialog" aria-modal="true"><button class="modal-close icon-btn" id="closeModal"><svg><use href="#i-close"/></svg></button><div id="modalContent"></div></section></div>
-<script>
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  window.supabaseClient = createClient(
+    'https://kllblgqceqmlxtatslfz.supabase.co',
+    'sb_publishable_nI1Z9X_brnZqOD_wj_C7wg_4xOzTKzw'
+  );
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)], icon=(id)=>`<svg><use href="#i-${id}"/></svg>`;
 try{localStorage.removeItem('da-theme')}catch{}
 const app={page:'dashboard',theme:'light',role:'intern',filter:'Все материалы',question:0,answered:{},testStarted:false,ratingPeriod:'month',reviewTab:'videos',messageTab:'chat',profile:{name:'Алия Нурланова',role:'Стажёр · Терапия',email:'aliya@example.kz',specialty:'Терапевтическая стоматология',region:'Астана',language:'Русский'}};
