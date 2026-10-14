@@ -1,30 +1,38 @@
-# DentAcademy backend foundation
+# Aray Dent Academy
 
-This folder starts the backend on Supabase (PostgreSQL + Supabase Auth + row-level security). It defines tenant-aware organizations, memberships, courses, lessons, tests, progress, certificates, conversations, webinars, library materials, saved materials, and notes.
+Демо платформы онлайн-обучения для стоматологов. Сайт размещается на Netlify, регистрация и вход подключены к Supabase Auth.
 
-## Files
+## Структура репозитория
 
-- `config.toml` — Supabase local project settings.
-- `migrations/20261013000100_initial_schema.sql` — versioned schema and access policies.
-- `.env.example` — placeholders only; never commit a real `.env` or secret key.
+- `index.html` — актуальная самодостаточная демо-версия. HTML, CSS и JavaScript находятся внутри файла. Netlify публикует его из корня репозитория.
+- `supabase/` — настройки проекта Supabase и миграции базы данных.
+- `.env.example` — пример имён переменных; реальные секреты сюда не добавлять.
+- `.gitignore` — исключения для Git.
 
-## Apply the migration
+Старые `DentAcademy-demo.html`, `app.js` и `styles.css` не используются опубликованным `index.html`. Если они сохранены в репозитории, это архивные файлы; актуальную версию интерфейса меняйте в `index.html`.
 
-1. Create a Supabase project and install the Supabase CLI, following the official setup docs.
-2. From the repository root, authenticate with `supabase login`, then link the local project with `supabase link`.
-3. Review the migration, then run `supabase db push` to apply it. Use a separate development project first; do not connect this starter to production data.
-4. Create a test user through Supabase Auth. The database trigger creates its `profiles` row. Create an organization, then give its creator the initial `admin` membership. Subsequent role grants should be performed by an authorized administrator.
-5. Keep schema changes in new timestamped files under `supabase/migrations/`; do not edit an already-applied migration.
+## Публикация демо
 
-Official references:
+1. Внесите изменения в `index.html` и сохраните их коммитом в GitHub.
+2. Netlify автоматически соберёт новый деплой из корня репозитория.
+3. После статуса **Published** откройте сайт и проверьте основные сценарии.
 
-- [Database migrations](https://supabase.com/docs/guides/deployment/database-migrations)
-- [Row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
-- [Supabase CLI](https://supabase.com/docs/reference/cli/introduction)
+Для корневого адреса сайта нужен файл `index.html` в публикуемой папке.
 
-## Important implementation notes
+## Supabase
 
-- The front end is not connected to this schema yet; the next implementation step is authentication and typed API calls.
-- Files are represented by storage paths. A later migration must define private Storage buckets and matching `storage.objects` policies before accepting real documents.
-- Test question `options` are visible to authenticated users for this demo foundation. Before real exams, separate answer keys from public question data and submit/score attempts through a trusted server-side function.
-- This first migration is a development foundation, not a production security review. Review policies with test accounts for each role before loading real user or clinic data.
+В `index.html` используется Supabase URL и публичный **Publishable key** для работы Auth в браузере. Publishable key предназначен для клиентского приложения; **Secret key** и `service_role` нельзя помещать в HTML, GitHub или браузерный код.
+
+Схема базы данных находится в `supabase/migrations/`. Применяйте миграции к проекту Supabase через SQL Editor или поддерживаемый процесс миграций. Не запускайте повторно начальную миграцию поверх уже созданных таблиц без проверки.
+
+Пока Supabase Auth обслуживает создание аккаунта и вход. Остальные разделы демо и их демонстрационные данные не следует считать полностью перенесёнными в базу данных.
+
+## Перед показом
+
+- Используйте тестовые аккаунты и демонстрационные данные.
+- Проверьте создание аккаунта, подтверждение почты при включённом подтверждении, выход и повторный вход.
+- Проверьте опубликованный Netlify-деплой после каждого изменения `index.html`.
+
+## Дальнейшая разработка
+
+Подключайте разделы платформы к таблицам Supabase постепенно: сначала определите модель данных и права доступа (RLS), затем связывайте интерфейс с API и проверяйте сценарии для каждой роли. Не используйте реальные данные учеников или пациентов в демо.
