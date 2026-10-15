@@ -296,7 +296,24 @@ function roleDashboard(){if(app.role==='learner')return renderDashboard();if(app
 const _renderPageForRoles=renderPage;
 renderPage=function(){const allowed=roleRoutes[app.role]||roleRoutes.learner;if(!allowed.includes(app.page))app.page=roleInfo[app.role]?.home||'dashboard';if(app.page==='dashboard'&&app.role!=='learner'){$('#crumbSection').textContent='Управление';$('#crumbPage').textContent=app.role==='chief'?'Главный врач':roleInfo[app.role].label;$$('.nav-item[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page==='dashboard'));$('#page').innerHTML=roleDashboard()}else _renderPageForRoles();$$('.nav-item[data-page]').forEach(b=>{b.hidden=!allowed.includes(b.dataset.page)});$$('.nav-label').forEach(label=>{const nav=label.nextElementSibling;if(nav?.classList.contains('nav-list'))label.hidden=!Array.from(nav.querySelectorAll('.nav-item')).some(b=>!b.hidden)});if($('#roleSwitcher'))$('#roleSwitcher').innerHTML=`${roleInfo[app.role]?.label||'Ученик'} <svg><use href="#i-chevron"/></svg>`;if($('.profile-mini small'))$('.profile-mini small').textContent=roleInfo[app.role]?.profile||app.profile.role};
 authModal=function(type='login'){app.authMode=type;const title=type==='register'?'Создать аккаунт':type==='forgot'?'Восстановление пароля':'Вход в DentAcademy';if(type==='register'){openModal(title,'<p>Создайте личный профиль ученика или врача. Доступ администратора и главного врача назначается организацией.</p><div class="field"><label>ФИО *</label><input id="authName" autocomplete="name" placeholder="Имя и фамилия"></div><div class="field"><label>Почта *</label><input id="authEmail" type="email" autocomplete="email" placeholder="name@clinic.kz"></div><div class="field"><label>Тип профиля</label><select id="authAccountType"><option value="learner">Ученик / стажёр</option><option value="doctor">Врач-стоматолог</option></select></div><div class="field"><label>Специализация</label><input id="authSpecialty" placeholder="Например, терапевтическая стоматология"></div><div class="field"><label>Пароль *</label><input id="authPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Не менее 8 символов"></div><p class="auth-note">Для подтверждения может потребоваться перейти по ссылке из письма.</p>','<button class="btn btn-outline" data-auth="login">У меня есть аккаунт</button><button class="btn btn-primary" data-action="auth-submit">Создать аккаунт</button>');return}if(type==='forgot'){openModal(title,'<p>На указанную почту придёт ссылка для сброса пароля.</p><div class="field"><label>Почта аккаунта</label><input id="authEmail" type="email" autocomplete="email" placeholder="name@clinic.kz"></div>','<button class="btn btn-outline" data-auth="login">Назад ко входу</button><button class="btn btn-primary" data-action="auth-submit">Отправить ссылку</button>');return}openModal(title,'<p>Войдите в аккаунт DentAcademy.</p><div class="field"><label>Почта</label><input id="authEmail" type="email" autocomplete="email" placeholder="name@clinic.kz"></div><div class="field"><label>Пароль</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Пароль"></div><div class="auth-links"><a href="#" data-auth="forgot">Забыли пароль?</a><span>Вход защищён Supabase Auth</span></div>','<button class="btn btn-outline" data-auth="register">Регистрация</button><button class="btn btn-primary" data-action="auth-submit">Войти</button>')};
-async function loadAuthProfile(user){app.profile.email=user.email||'';const {data,error}=await window.supabaseClient.from('profiles').select('full_name,email,specialty,region,city,phone').eq('id',user.id).maybeSingle();if(error)console.warn('Profile read failed:',error.message);if(data){app.profile.name=data.full_name||app.profile.name;app.profile.email=data.email||user.email||'';app.profile.specialty=data.specialty||app.profile.specialty;app.profile.region=data.city||data.region||app.profile.region;app.profile.phone=data.phone||app.profile.phone}app.role='learner';app.profile.role=app.profile.role||'Ученик';persistRole();app.page='dashboard';renderPage()}
+async function loadAuthProfile(user){
+  app.authUserId=user.id;
+  app.profile.email=user.email||'';
+  const {data,error}=await window.supabaseClient.from('profiles').select('full_name,email,specialty,region,city,phone').eq('id',user.id).maybeSingle();
+  if(error){console.warn('Profile read failed:',error.message);toast('Не удалось загрузить профиль: '+error.message)}
+  if(data){
+    app.profile.name=data.full_name||app.profile.name;
+    app.profile.email=user.email||data.email||'';
+    app.profile.specialty=data.specialty||user.user_metadata?.specialty||app.profile.specialty;
+    app.profile.region=data.city||data.region||app.profile.region;
+    app.profile.phone=data.phone||app.profile.phone;
+    if(data.email!==user.email){
+      const {error:emailSyncError}=await window.supabaseClient.from('profiles').update({email:user.email||null}).eq('id',user.id);
+      if(emailSyncError)console.warn('Profile email sync failed:',emailSyncError.message);
+    }
+  }
+  app.role='learner';app.profile.role=app.profile.role||'Ученик';persistRole();app.page='dashboard';renderPage()
+}
 
 const _roleModalAction=modalForAction;
 modalForAction=function(a,el){
@@ -505,7 +522,40 @@ modalForAction=function(a,el){
  if(a==='complete-expanded-assessment'){const fields=expandedAssessment.map((_,i)=>$(`#diag${i+1}`));if(fields.some(f=>!f||!f.value)){toast('Ответьте на все 10 вопросов');return}const score=Math.round(fields.reduce((sum,f)=>sum+(f.value==='1'?1:0),0)/fields.length*100),passed=score>=80;app.doctorTrack={status:passed?'passed':'learning',score,completedAt:new Date().toISOString()};persistRole();const buttons=passed?'<button class="btn btn-outline" data-action="continue-doctor-learning">Продолжить обучение</button><button class="btn btn-primary" data-action="become-mentor">Стать наставником</button>':'<button class="btn btn-outline" data-action="continue-doctor-learning">Продолжить обучение</button><button class="btn btn-primary" data-action="doctor-assessment">Повторить оценку</button>';openModal(`Результат диагностики · ${score}%`,`<p>${passed?'Порог пройден. Выберите: развиваться дальше как ученик или перейти к наставничеству.':'Для роли наставника пока нужно продолжить обучение и пройти диагностику повторно.'}</p><div class="status ${passed?'':'warning'}">${score}% · порог 80%. Практический допуск подтверждается наставником отдельно.</div>`,buttons);return}
  if(a==='start-test'){app.pendingTest=el?.dataset.test||'Тест';openModal('Правила прохождения теста',`<p><b>${escapeHtml(app.pendingTest)}</b></p><ul class="test-rules"><li>Внимательно читайте формулировки и выбирайте один ответ.</li><li>Вопросы можно проходить по порядку; ответы фиксируются в этой попытке.</li><li>Перед началом убедитесь, что у вас есть время завершить тест.</li><li>После завершения появится результат и темы для повторения.</li></ul><p class="subhead">Демонстрационный тест не выдаёт медицинский или клинический допуск.</p>`,'<button class="btn btn-outline" data-action="close-modal">Отмена</button><button class="btn btn-primary" data-action="confirm-start-test">Начать тест</button>');return}
  if(a==='confirm-start-test'){app.page='quiz';app.question=0;app.answered={};app.testStarted=true;app.testTitle=app.pendingTest||'Тест';closeModal();renderPage();return}
- if(a==='save-account'){const name=$('#accountName')?.value.trim(),email=$('#accountEmail')?.value.trim(),regionSelect=$('#accountRegion')?.value,custom=$('#accountRegionCustom')?.value.trim();if(!name||!email||!$('#accountEmail').checkValidity()){toast('Проверьте ФИО и адрес электронной почты');return}if(regionSelect==='other'&&!custom){toast('Укажите город или регион Казахстана');$('#accountRegionCustom')?.focus();return}app.profile.name=name;app.profile.email=email;app.profile.specialty=$('#accountSpecialty')?.value.trim()||'';app.profile.organization=$('#accountOrganization')?.value.trim()||app.profile.organization||'';app.profile.region=regionSelect==='other'?custom:regionSelect;app.profile.language=$('#accountLanguage')?.value||'Русский';app.theme='light';persistRole();closeModal();renderPage();toast('Данные аккаунта сохранены');return}
+ if(a==='save-account'){
+  const name=$('#accountName')?.value.trim(),email=$('#accountEmail')?.value.trim(),regionSelect=$('#accountRegion')?.value,custom=$('#accountRegionCustom')?.value.trim();
+  if(!name||!email||!$('#accountEmail').checkValidity()){toast('Проверьте ФИО и адрес электронной почты');return}
+  if(regionSelect==='other'&&!custom){toast('Укажите город или регион Казахстана');$('#accountRegionCustom')?.focus();return}
+  const specialty=$('#accountSpecialty')?.value.trim()||'';
+  const organization=$('#accountOrganization')?.value.trim()||app.profile.organization||'';
+  const language=$('#accountLanguage')?.value||'Русский';
+  const saveLocal=()=>{
+    app.profile.name=name;app.profile.email=email;app.profile.specialty=specialty;app.profile.organization=organization;
+    app.profile.region=regionSelect==='other'?custom:regionSelect;app.profile.language=language;app.theme='light';persistRole();closeModal();renderPage();
+  };
+  const client=window.supabaseClient;
+  if(!client){saveLocal();toast('Данные сохранены в этом браузере');return}
+  client.auth.getUser().then(async({data,error})=>{
+    if(error){toast('Не удалось проверить аккаунт Supabase: '+error.message);return}
+    const user=data?.user;
+    if(!user){saveLocal();toast('Данные сохранены в этом браузере');return}
+    let emailChangePending=false;
+    if(email!==user.email){
+      const {error:emailError}=await client.auth.updateUser({email});
+      if(emailError){toast('Не удалось изменить почту: '+emailError.message);return}
+      emailChangePending=true;
+    }
+    const {data:profileRow,error:profileError}=await client.from('profiles').update({
+      full_name:name,email:user.email||email,specialty:specialty||null,
+      region:'Казахстан',city:regionSelect==='other'?custom:regionSelect
+    }).eq('id',user.id).select('id').maybeSingle();
+    if(profileError||!profileRow){toast('Не удалось сохранить профиль в Supabase: '+(profileError?.message||'профиль аккаунта не найден'));return}
+    app.profile.name=name;app.profile.email=user.email||email;app.profile.specialty=specialty;app.profile.organization=organization;
+    app.profile.region=regionSelect==='other'?custom:regionSelect;app.profile.language=language;app.theme='light';persistRole();closeModal();renderPage();
+    toast(emailChangePending?'Профиль сохранён. Подтвердите новый адрес по письму Supabase':'Профиль сохранён в Supabase');
+  }).catch(error=>toast('Не удалось сохранить профиль: '+(error?.message||'ошибка соединения')));
+  return;
+}
  _actionsBeforeExpandedFlows(a,el)
 };
 document.addEventListener('change',e=>{if(e.target.id==='accountRegion'){const other=e.target.value==='other',input=$('#accountRegionCustom');if(input){input.style.display=other?'block':'none';if(other)input.focus()}}});
@@ -604,5 +654,6 @@ renderPage();
 if(window.supabaseClient)window.supabaseClient.auth.getSession().then(({data,error})=>{if(error)console.warn('Session restore failed:',error.message);if(data?.session?.user)loadAuthProfile(data.session.user)});
 
 </script>
+<script src="./lms-frontend.js"></script>
 </body>
 </html>
